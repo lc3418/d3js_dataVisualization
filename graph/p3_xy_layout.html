@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>p3_xy_layout.html</title>
+    <script src="https://d3js.org/d3.v5.min.js"></script>
+</head>
+<body>
+    <h3>Scroll up or down to zoom in or out</h3>
+</body>
+<style>
+    *{
+        margin: 0;
+        padding: 0;
+    }
+    svg {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+    }
+    line {
+        stroke: rgb(209, 209, 209);
+    }
+    /* text {
+        text-anchor: middle;
+        fill: #000;
+        font-size: 12px;
+    } */
+    /* circle {
+        fill: cadetblue;
+    }
+    circle:hover {
+        fill: red;
+    } */
+    div {
+        position: absolute;
+        width: 300px;
+        height: 200px;
+        font-size: 20px;
+    }
+    h3 {
+        position: absolute;
+        top: 10px;
+        left: 40%;
+    }
+</style>
+<script>
+    function mouseOver(node) {
+        var e = window.event
+        node.style.fill = "blue"
+        var newNode = document.createElement("div")
+        newNode.setAttribute("id", "name")
+        newNode.style.left = e.pageX + 10 + "px"
+        newNode.style.top = e.pageY + "px"
+        newNode.innerHTML = node.getAttribute("text")
+        //document.getElementById("main").appendChild(newNode)
+        document.body.appendChild(newNode)
+    }
+    function mouseOut(node) {
+        node.style.fill = "cadetblue"
+        var n = document.getElementById("name")
+        document.body.removeChild(n)
+        
+    }
+    var nodes = [],
+        links = [];
+
+    var svg = d3.select("body")
+            .append("svg")
+            .attr("width", "100%")
+            .attr("height", "100%")
+            .attr("id", "main")
+            //.attr("overflow", "scroll")
+
+    d3.json("./USAir97v2.json").then(function(data){
+        for(let key in data) {
+            if(key === 'nodes') {
+                for(let item in data[key]) {
+                    nodes.push(data[key][item])
+                }
+            }
+            else {
+                for(let item in data[key]) {
+                    links.push(data[key][item])
+                }
+            }
+        }
+        var pos = [];
+        for(let i of links) {
+            var start = [nodes[i.source-1].posx, nodes[i.source-1].posy];
+            var dest = [nodes[i.target-1].posx, nodes[i.target-1].posy];
+            pos.push([start, dest]);
+        }
+
+        var simulation = d3.forceSimulation(nodes)
+                        .force('charge', d3.forceManyBody().strength(-1000))
+                        .force('link', d3.forceLink(links)
+                            .id(function(d) {return d.id})
+                            .distance(30)
+                        )
+                        .on('tick', ticked);
+                        
+        function ticked() {
+            var l = d3.select('svg')
+                    .selectAll('line')
+                    .data(pos)
+            l.enter()
+                .append('line')
+                .merge(l)
+                .attr('x1', function(d) {return d[0][0]*1500})
+                .attr('y1', function(d) {return d[0][1]*1500})
+                .attr('x2', function(d) {return d[1][0]*1500})
+                .attr('y2', function(d) {return d[1][1]*1500})
+            //l.exit().remove()
+
+            var n = d3.select('svg')
+                    .selectAll('circle')
+                    .data(nodes)
+            n.enter()
+                .append('circle')
+                //.text(function(d) {return d.name})
+                .merge(n)
+                .attr('cx', function(d) {return d.posx*1500})
+                .attr('cy', function(d) {return d.posy*1500})
+                .attr('r', 5) 
+                .style('fill', "cadetblue")
+                .attr('text', function(d) {return d.name})
+                .attr('id', function(d) {return d.id})
+                .attr('onmouseover', "mouseOver(this)")
+                .attr('onmouseout', "mouseOut(this)")
+            //n.exit().remove()
+            
+            function zooming() {
+                l.attr("transform", d3.event.transform)
+                n.attr("transform", d3.event.transform)
+            }
+            var zoom_handler = d3.zoom()
+                        .on("zoom", zooming)
+            zoom_handler(svg)
+        }
+    })
+</script>
+</html>

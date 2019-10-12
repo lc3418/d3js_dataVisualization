@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>p3_geospatial.html</title>
+    <script src="https://d3js.org/d3.v4.min.js"></script>
+</head>
+<body>
+    <h3>Stop the cursor at a node to see its info</h3>
+</body>
+<style>
+    *{
+        margin:0;
+        padding:0;
+    }
+    #main {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+    }
+    div {
+        position: absolute;
+        width: 300px;
+        height: 200px;
+        font-size: 20px;
+        font-weight: bold;
+        /* border: 1px solid */
+    }
+    line {
+        stroke: rgb(58, 56, 56);
+    }
+    h3 {
+        position: absolute;
+        top: 10px;
+        left: 40%;
+    }
+</style>
+<script>
+    function mouseOver(node) {
+        var e = window.event
+        //node.style.fill = "blue"
+        var newNode = document.createElement("div")
+        newNode.setAttribute("id", "name")
+        newNode.style.left = 10 + "px"
+        newNode.style.top = e.pageY - 100 + "px"
+        newNode.innerHTML = "Airport: " + node.getAttribute("name") + "<br/>" + 
+                            "City: " + node.getAttribute('city') + "<br/>" + 
+                            "State: " + node.getAttribute('state') + "<br/>" + 
+                            "Number of Routes: " + node.getAttribute('count')
+        //document.getElementById("main").appendChild(newNode)
+        document.body.appendChild(newNode)
+    }
+    function mouseOut(node) {
+        //node.style.fill = "cadetblue"
+        var n = document.getElementById("name")
+        document.body.removeChild(n)
+        
+    }
+
+    var nodes = [],
+        links = [],
+        state_arr = [];
+
+    var width = 1500,
+        height = 1000;
+
+    var projection = d3.geoAlbersUsa()
+                    .translate([width/2, height/2])
+                    .scale([1500])
+
+    var path = d3.geoPath()
+                .projection(projection)
+    
+    function getRandomColor() {
+        var letter = "ABCDEF0123456789"
+        var color = "#"
+        for(let i = 0; i < 6; i++) {
+            color += letter[Math.floor(Math.random() * 16)]
+        }
+        return color;
+    }
+
+    var color_arr = [];
+    for(let i = 0; i < 54; i++) {
+        color_arr.push(getRandomColor());
+    }
+
+    var svg = d3.select("body")
+                .append("svg")
+                .attr("width", width)
+                .attr("height", height)
+                .attr("id", "main")
+    
+    d3.json("./us-states.json", function(us){
+        svg.selectAll("path")
+                .data(us.features)
+                .enter()
+                .append("path")
+                .attr("d", path)
+                .style("fill", "rgb(177, 174, 174)")
+        d3.json("./USAir97v2.json", function(data){
+            for(let key in data) {
+                if(key === 'nodes') {
+                    for(let item in data[key]) {
+                        state_arr.push(data[key][item].state)
+                        nodes.push(data[key][item])
+                    }
+                }
+                else {
+                    for(let item in data[key]) {
+                        links.push(data[key][item])
+                    }
+                }
+            }
+            for(let i of nodes) {
+                var pos = projection([i.longitude, i.latitude]); 
+                i.pos = pos;
+                i.weight = 0;
+            }
+
+            var pos = [];
+            for(let i of links) {
+                var start = [nodes[i.source-1].longitude, nodes[i.source-1].latitude];
+                var dest = [nodes[i.target-1].longitude, nodes[i.target-1].latitude];
+                pos.push([projection(start), projection(dest)]);
+                nodes[i.source-1].weight++;
+                nodes[i.target-1].weight++;
+            }
+            //console.log(pos)
+            var state_set = new Set(state_arr);
+            state_arr = Array.from(state_set);
+            
+            svg.selectAll("circle")
+                .data(nodes)
+                .enter()
+                .append("circle")
+                .attr("r", 10)
+                //.attr("id", function(d) {return projection([d.longitude, d.latitude])})
+                .attr("cx", function(d) {if(d.pos !== null) return d.pos[0]})
+                .attr("cy", function(d) {if(d.pos !== null) return d.pos[1]})
+                .style("fill", function(d) {
+                    var color = "";
+                    for(let i in state_arr) {
+                        if(d.state === state_arr[i]) {
+                            color = color_arr[i];
+                        }
+                    }
+                    return color;
+                })
+                .attr('name', function(d) {return d.name})
+                .attr('state', function(d){return d.state})
+                .attr('city', function(d){return d.city})
+                .attr('count', function(d){return d.weight})
+                .attr('onmouseover', "mouseOver(this)")
+                .attr('onmouseout', "mouseOut(this)")
+
+            svg.selectAll("line")
+                .data(pos)
+                .enter()
+                .append("line")
+                .attr("x1", function(d){if(d[0] !== null && d[1] !== null) return d[0][0]})
+                .attr("y1", function(d){if(d[0] !== null && d[1] !== null) return d[0][1]})
+                .attr("x2", function(d){if(d[0] !== null && d[1] !== null) return d[1][0]})
+                .attr("y2", function(d){if(d[0] !== null && d[1] !== null) return d[1][1]})
+                .attr("opacity", 0.5)
+        })
+    })        
+</script>
+</html>
